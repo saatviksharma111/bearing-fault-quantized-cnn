@@ -9,18 +9,23 @@ Output: results/benchmark_table.csv (your paper's centerpiece table)
 import os
 import time
 import csv
+import warnings
+
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.metrics import accuracy_score, f1_score
 
 from model import LightweightCNN1D
+from quantize import to_static_quantized
+
+warnings.filterwarnings("ignore")  # torch.ao.quantization deprecation noise
 
 PROC_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
 
 N_LATENCY_RUNS = 500
 N_WARMUP = 20
+CALIB_BATCH = 32  # priming batch size when rebuilding the INT8 module tree
 
 
 def measure_latency(model, sample_input):
@@ -51,8 +56,10 @@ def benchmark_one(feature_type, quant_type, n_classes, input_len, X_test, y_test
     if quant_type == "FP32":
         state_path = os.path.join(RESULTS_DIR, f"{feature_type}_model_fp32.pt")
         model.load_state_dict(torch.load(state_path, map_location="cpu"))
-    else:  # INT8
-        model = torch.quantization.quantize_dynamic(model, {nn.Linear}, dtype=torch.qint8)
+    else:  # INT8 - static quantization
+        # Rebuild the exact converted-INT8 module tree, then load the calibrated
+        # scales / zero-points / packed weights from quantize.py's output.
+        model = to_static_quantized(model, example_input=X_test[:CALIB_BATCH])
         state_path = os.path.join(RESULTS_DIR, f"{feature_type}_model_int8.pt")
         model.load_state_dict(torch.load(state_path, map_location="cpu"))
 

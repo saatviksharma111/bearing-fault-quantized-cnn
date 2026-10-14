@@ -60,8 +60,10 @@ def main():
     labels = [FILENAME_TO_LABEL[f] for f in filenames]
 
     # Split by FILE first — this is the leak-proof step.
+    # test_size=0.5 so temp keeps >=2 files per class (only 4 files/class total),
+    # which the val/test stratified split below requires.
     train_files, temp_files, train_labels, temp_labels = train_test_split(
-        filenames, labels, test_size=0.3, stratify=labels, random_state=RANDOM_SEED
+        filenames, labels, test_size=0.5, stratify=labels, random_state=RANDOM_SEED
     )
     val_files, test_files, val_labels, test_labels = train_test_split(
         temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=RANDOM_SEED
